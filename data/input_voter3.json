@@ -1,0 +1,15 @@
+{
+  "root": "0x181f3313e137c674c535ddcccfbdee8cab7b62ef333d8d8fbdc93a872fc31175",
+  "leaf": "0x15a59e7f4e870fe9d5d3486459917d9467609f80a3507d90c0183ebd98d2a44e",
+  "pathElements": [
+    "0x189c301bafc0adec98ad0f42b41a967db31a9ff3b1f5fe9bdbb73d3a8cfce6d4",
+    "0x086cd0b76dd829e7f3a6a38bd881f3ae96e30775291b53d479a6107d3797193b",
+    "0x122107c02dffa68ca51beb02a05b01cc86709b246b9a8c8585c92232054a4954"
+  ],
+  "pathIndices": [
+    1,
+    0,
+    1
+  ],
+  "electionId": "2025"
+}
