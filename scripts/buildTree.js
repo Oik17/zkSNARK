@@ -1,33 +1,21 @@
-// scripts/buildTree.js
-// Run with: node scripts/buildTree.js
-
 const fs = require("fs");
 const circomlibjs = require("circomlibjs");
 const { MerkleTree } = require("merkletreejs");
 
-// helper: bigint -> 32 byte buffer
 function toBuffer32(bi) {
-  let hex = bi.toString(16);
-  if (hex.length % 2) hex = "0" + hex;
-  // pad to 64 hex chars (32 bytes)
-  hex = hex.padStart(64, "0");
+  let hex = bi.toString(16).padStart(64, "0");
   return Buffer.from(hex, "hex");
 }
 
-(async function main() {
-  // Build Poseidon (async)
-  const poseidon = await circomlibjs.buildPoseidon(); // returns poseidon function + .F
+(async () => {
+  const poseidon = await circomlibjs.buildPoseidon();
   const F = poseidon.F;
 
-  function poseidonHashBigint(inputs /* array of BigInt */) {
-    // poseidon expects array of BigInt-ish values
+  function poseidonHashBigint(inputs) {
     const res = poseidon(inputs);
-    // res is a field element (object); convert with F.toString
-    const bi = BigInt(F.toString(res));
-    return bi;
+    return BigInt(F.toString(res));
   }
 
-  // Example electionId and secrets (use big randoms in real usage)
   const electionId = 2025n;
   const voters = [
     { name: "V1", secret: 1111111111111111111n },
@@ -40,52 +28,70 @@ function toBuffer32(bi) {
     { name: "V8", secret: 8888888888888888888n },
   ];
 
-  // Compute leaf = Poseidon(secret, electionId)
-  const leaves = voters.map(v => {
-    const h = poseidonHashBigint([v.secret, electionId]);
-    return toBuffer32(h);
-  });
+  // compute leaf = Poseidon(secret, electionId)
+  const leavesBI = voters.map(v =>
+    poseidonHashBigint([v.secret, electionId])
+  );
 
-  // custom poseidon hash function for merkletree internal nodes
+  // build tree
   function poseidonHashBuffer(data) {
-    // merkletreejs will pass the concatenated Buffer of (left+right).
-    // We split the buffer in half to get left and right node bytes.
-    // For leaf nodes, merkletreejs will not call hashFn if hashLeaves:false.
-    const half = data.length / 2;
-    const left = data.slice(0, half);
-    const right = data.slice(half);
-    const leftBI = BigInt("0x" + left.toString("hex"));
-    const rightBI = BigInt("0x" + right.toString("hex"));
-    const h = poseidonHashBigint([leftBI, rightBI]);
-    return toBuffer32(h);
+    const leftBI = BigInt("0x" + data.slice(0, 32).toString("hex"));
+    const rightBI = BigInt("0x" + data.slice(32).toString("hex"));
+    return toBuffer32(poseidonHashBigint([leftBI, rightBI]));
   }
 
-  // Build Merkle tree using our poseidon hash for internal nodes
-  const tree = new MerkleTree(leaves, poseidonHashBuffer, { hashLeaves: false, sortPairs: true });
+  const leavesBuf = leavesBI.map(toBuffer32);
 
-  const root = tree.getRoot(); // Buffer
-  const rootHex = "0x" + root.toString("hex");
-  console.log("MERKLE ROOT:", rootHex);
+  const tree = new MerkleTree(leavesBuf, poseidonHashBuffer, {
+    hashLeaves: false,
+    sortPairs: false,
+  });
 
-  // pick a demo voter (index 2 -> V3)
-  const idx = 2;
-  const leaf = leaves[idx];
+  const rootDecimal = BigInt("0x" + tree.getRoot().toString("hex")).toString();
+  console.log("MERKLE ROOT (decimal):", rootDecimal);
 
-  // Extract proof (array of sibling nodes)
-  const proof = tree.getProof(leaf); // array of { position, data }
-  const pathElements = proof.map(p => "0x" + p.data.toString("hex"));
-  const pathIndices = proof.map(p => (p.position === "right" ? 1 : 0));
+  // pick V3
+  let leafIndex = 2;
+  const leafDecimal = leavesBI[leafIndex].toString();
+  const voter = voters[leafIndex];
+
+  // manually generate path elements in decimal strings
+  const pathElements = [];
+  const pathIndices = [];
+
+  let index = leafIndex;
+  let level = [...leavesBI];
+  const DEPTH = 3; 
+
+  for (let d = 0; d < DEPTH; d++) {
+    const siblingIndex = index % 2 === 0 ? index + 1 : index - 1;
+    const sibling = siblingIndex < level.length ? level[siblingIndex] : 0n;
+
+    pathElements.push(sibling.toString());
+    pathIndices.push(index % 2); // 0 = left, 1 = right
+
+    // compute next level
+    const nextLevel = [];
+    for (let i = 0; i < level.length; i += 2) {
+      const left = level[i];
+      const right = i + 1 < level.length ? level[i + 1] : 0n;
+      nextLevel.push(poseidonHashBigint([left, right]));
+    }
+    level = nextLevel;
+    index = Math.floor(index / 2);
+}
+
 
   const input = {
-    root: rootHex,
-    leaf: "0x" + leaf.toString("hex"),
+    root: rootDecimal,
+    leaf: leafDecimal,
     pathElements,
     pathIndices,
+    secret: voter.secret.toString(),
     electionId: electionId.toString(),
-    // secret not written here (sensitive) — you'll add it to witness input later
   };
 
   if (!fs.existsSync("data")) fs.mkdirSync("data");
   fs.writeFileSync("data/input_voter3.json", JSON.stringify(input, null, 2));
-  console.log("Wrote data/input_voter3.json");
+  console.log("✅ Wrote data/input_voter3.json (decimal numbers)");
 })();

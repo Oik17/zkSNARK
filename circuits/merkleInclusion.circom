@@ -1,5 +1,4 @@
-pragma circom 2.1.9;
-include "lib/poseidon.circom"; // adjust path if your poseidon file sits elsewhere
+include "lib/poseidon.circom";
 
 template MerkleInclusion(depth) {
     // Public input
@@ -70,4 +69,4 @@ template MerkleInclusion(depth) {
     nullifier <== nf.out;
 }
 
-component main = MerkleInclusion(16);
+component main = MerkleInclusion(3);

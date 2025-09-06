@@ -1,37 +1,26 @@
+// scripts/makeWitness.js
 const fs = require("fs");
 const { execSync } = require("child_process");
 
-const DEPTH = 16; // must match your circuit
+const DEPTH = 3; // must match circuit
 
-// Load the input prepared earlier
 const raw = JSON.parse(fs.readFileSync("data/input_voter3.json", "utf8"));
 
-// Convert hex -> decimal string (snarkjs requires this)
-function hexToDec(x) {
-  return BigInt(x).toString(10);
-}
-
-// Pad proof arrays
-function padArray(arr, len) {
-  const padded = [...arr];
-  while (padded.length < len) padded.push("0x0");
-  return padded.slice(0, len);
-}
-
-// Prepare the final input object
 const input = {
-  root: hexToDec(raw.root),
-  leaf: hexToDec(raw.leaf),
-  pathElements: padArray(raw.pathElements, DEPTH).map(hexToDec),
-  pathIndices: padArray(raw.pathIndices, DEPTH).map(x =>
-    typeof x === "string" ? BigInt(x).toString(10) : x.toString()
-  ),
+  root: raw.root,
+  leaf: raw.leaf,
+  secret: raw.secret,
+  electionId: raw.electionId,
+  pathElements: raw.pathElements.slice(0, DEPTH).map(x => x.toString()),
+  pathIndices: raw.pathIndices.slice(0, DEPTH).map(Number),
 };
 
-// Save input JSON for witness gen
-fs.writeFileSync("data/witness_input.json", JSON.stringify(input, null, 2));
+fs.writeFileSync(
+  "data/witness_input.json",
+  JSON.stringify(input, null, 2)
+);
+console.log("📝 witness_input.json prepared");
 
-// Call witness generator (compiled by Circom)
 execSync(
   `node build/merkleInclusion_js/generate_witness.js build/merkleInclusion_js/merkleInclusion.wasm data/witness_input.json build/witness.wtns`,
   { stdio: "inherit" }
