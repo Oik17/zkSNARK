@@ -9,7 +9,7 @@ if (!fs.existsSync(path)) {
 const arr = JSON.parse(fs.readFileSync(path, "utf8"));
 const counts = {};
 
-for (const rec of arr) {
+for (const rec of arr) {    
   const choice = rec.ballot.choice;
   counts[choice] = (counts[choice] || 0) + 1;
 }
