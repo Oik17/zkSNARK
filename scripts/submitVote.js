@@ -1,3 +1,4 @@
+// scripts/submitVote.js
 const fs = require("fs");
 const { groth16 } = require("snarkjs");
 
@@ -10,7 +11,12 @@ const pub = JSON.parse(fs.readFileSync("build/public.json", "utf8"));
 const vkey = JSON.parse(fs.readFileSync("build/verification_key.json", "utf8"));
 
 (async () => {
+  // Measure verification time
+  const verifyStart = Date.now();
   const ok = await groth16.verify(vkey, pub, proof);
+  const verifyEnd = Date.now();
+  console.log(`⏱️ Verification time: ${verifyEnd - verifyStart}ms`);
+
   if (!ok) {
     console.error("❌ Proof invalid. Vote rejected.");
     process.exit(1);
@@ -20,7 +26,9 @@ const vkey = JSON.parse(fs.readFileSync("build/verification_key.json", "utf8"));
   // Append to ledger
   const path = "ledger/votes.json";
   let arr = [];
-  if (fs.existsSync(path)) arr = JSON.parse(fs.readFileSync(path, "utf8"));
+  if (fs.existsSync(path)) {
+    arr = JSON.parse(fs.readFileSync(path, "utf8"));
+  }
   arr.push({
     ballot,
     proof: "(omitted here)", // keep it light
